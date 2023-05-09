@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint . --ext .ts,.tsx",
-    "build": "webpack --config webpack.config.ts && rimraf dist && tsc",
+    "build": "rimraf dist && webpack --config webpack.config.ts && tsc && cp index.html dist/",
     "start": "node dist/server.js",
     "watch": "webpack serve --config webpack.config.ts",
     "load": "ts-node ./development/loadDatabase.ts",
