@@ -14,7 +14,7 @@ import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import IconButton from '@mui/material/IconButton';
 
-import catJpeg from './components/images/cat.jpeg';
+import catJpeg from './images/cat.jpeg';
 
 const PhotoCard = () => {
   return (
