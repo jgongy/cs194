@@ -30,13 +30,19 @@ const commentSchema = new mongoose.Schema({
   authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   commentedModel: {
     type: String,
-    enum: ['Battle', 'Submission']
+    enum: ['Battle', 'Comment', 'Submission']
   },
   creationTime: {type: Date, default: Date.now},
   postId: { type: mongoose.Schema.Types.ObjectId,
             refPath: 'commentedModel' },
   text: String
 });
+
+/* Enforce that each Comment is unique.  */
+commentSchema.index(
+  { authorId: 1, commentedModel: 1, postId: 1 },
+  { unique: true }
+);
 
 commentSchema.pre(['deleteMany', 'findOneAndDelete'], async function() {
   const results = await Comment.find(this.getQuery(), '_id');

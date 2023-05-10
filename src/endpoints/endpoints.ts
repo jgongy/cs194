@@ -128,38 +128,6 @@
 
 /**
  * @openapi
- * /comment/{id}/like:
- *   post:
- *     summary: Like a comment.
- *     parameters:
- *       - $ref: '#/components/parameters/idParam'
- *     responses:
- *       200:
- *         description: Successfully liked the comment.
- *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
- *       500:
- *         $ref: '#/components/responses/500'
- */
-
-/**
- * @openapi
- * /comment/{id}/unlike:
- *   post:
- *     summary: Unlike a comment.
- *     parameters:
- *       - $ref: '#/components/parameters/idParam'
- *     responses:
- *       200:
- *         description: Successfully unliked the comment.
- *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
- *       500:
- *         $ref: '#/components/responses/500'
- */
-
-/**
- * @openapi
  * /submission/{id}:
  *   get:
  *     summary: Return information about a submission.
@@ -284,74 +252,4 @@
  *         $ref: '#/components/responses/401NotLoggedIn'
  *       500:
  *         $ref: '#/components/responses/500'
- */
-
-/**
- * @openapi
- * /user/{id}:
- *   get:
- *     summary: Returns information for user with id.
- *     parameters:
- *       - $ref: '#/components/parameters/idParam'
- *     responses:
- *       200:
- *         description: Successfully returned JSON object with user information.
- *       500:
- *         $ref: '#/components/responses/500'
- */
-
-/**
- * @openapi
- * /swagger/spec:
- *   get:
- *     summary: Returns JSON of Swagger OpenAPI specification.
- *     responses:
- *       200:
- *         description: Successful retrieval of Swagger JSON.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- */
-
-/**
- * @openapi
- * /swagger:
- *   get:
- *     summary: Returns OpenAPI specification of APIs.
- *     responses:
- *       200:
- *         description: Successful retrieval of OpenAPI specification.
- */
-
-/**
- * @openapi
- * /test/kitten:
- *   get:
- *     summary: Returns a single Kitten JSON object from MongoDB.
- *     responses:
- *       200:
- *         description: Successfully retrieved Kitten object.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Kitten'
- *       500:
- *         $ref: '#/components/responses/500'
- *
- */
-
-/**
- * @openapi
- * /test/ping:
- *   get:
- *     summary: Returns a 200 response on successful ping.
- *     responses:
- *       200:
- *         description: Returns 'Pong' text.
- *         content:
- *           text/plain:
- *            schema:
- *              type: string
- *              example: Pong
  */
