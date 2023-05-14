@@ -15,9 +15,13 @@ const commentRouter = express.Router();
  *       - $ref: '#/components/parameters/idParam'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/200ResourceRetrieved'
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Comment'
  *       404:
- *         $ref: '#/components/responses/404'
+ *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
 */
@@ -51,11 +55,11 @@ commentRouter.get('/:id', async (req, res) => {
  *       200:
  *         description: Successfully deleted comment.
  *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
+ *         $ref: '#/components/responses/401Unauthorized'
  *       403:
- *         $ref: '#/components/responses/403NotOwned'
+ *         $ref: '#/components/responses/403Forbidden'
  *       404:
- *         $ref: '#/components/responses/404'
+ *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
  */
@@ -73,11 +77,15 @@ commentRouter.delete('/:id', async (req, res) => {
     if (!result) {
       /* Did not find comment with id.  */
       res.status(404).send(`Comment with ID ${commentId} not found.`);
-    } else if (req.session.userId !== result.authorId.toString()) {
+    } else if (req.session.userId !== result.author.toString()) {
       /* User requesting change is not the comment's author.  */
       res.status(403).send('User is not the comment author.');
     } else {
-      await Comment.findByIdAndDelete(commentId);
+      await Comment.findByIdAndUpdate(commentId,
+                                      {
+                                        author: '000000000000000000000000',
+                                        text: ''
+                                      });
       res.status(200).send('Successfully deleted comment text.');
     }
   } catch (err) {
@@ -108,12 +116,16 @@ commentRouter.delete('/:id', async (req, res) => {
  *     responses:
  *       200:
  *         description: Successfully updated user comment.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Comment'
  *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
+ *         $ref: '#/components/responses/401Unauthorized'
  *       403:
- *         $ref: '#/components/responses/403NotOwned'
+ *         $ref: '#/components/responses/403Forbidden'
  *       404:
- *         $ref: '#/components/responses/404'
+ *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
  */
@@ -131,13 +143,13 @@ commentRouter.put('/:id', async (req, res) => {
     if (!result) {
       /* Did not find comment with id.  */
       res.status(404).send(`Comment with ID ${commentId} not found.`);
-    } else if (req.session.userId !== result.authorId.toString()) {
+    } else if (req.session.userId !== result.author.toString()) {
       /* User requesting change is not the comment's author.  */
       res.status(403).send('User is not the comment author.');
     } else {
       result.text = req.body.text;
-      await result.save();
-      res.status(200).send('Successfully updated comment text.');
+      const updatedComment = await result.save();
+      res.status(200).send(updatedComment);
     }
   } catch (err) {
     res.status(500).send('Internal server error.');
@@ -155,9 +167,9 @@ commentRouter.put('/:id', async (req, res) => {
  *       200:
  *         description: Successfully voted on the comment.
  *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
+ *         $ref: '#/components/responses/401Unauthorized'
  *       404:
- *         $ref: '#/components/responses/404ResourceNotFound'
+ *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
  */
@@ -196,9 +208,9 @@ commentRouter.put('/:id/vote', async (req, res) => {
  *       200:
  *         description: Successfully unvoted the comment.
  *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
+ *         $ref: '#/components/responses/401Unauthorized'
  *       404:
- *         $ref: '#/components/responses/404ResourceNotFound'
+ *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
  */

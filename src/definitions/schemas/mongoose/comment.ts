@@ -1,4 +1,4 @@
-"use strict"
+'use strict';
 
 import mongoose = require('mongoose');
 import { Vote } from './vote';
@@ -13,44 +13,45 @@ import { Vote } from './vote';
  *         _id:
  *           type: string
  *         __v:
- *           type: number 
- *         authorId:
+ *           type: number
+ *         author:
  *           type: string
  *         commentedModel:
  *           type: string
  *         creationTime:
  *           type: string
  *           format: date-time
- *         postId:
+ *         post:
  *           type: string
  *         text:
  *           type: string
  */
 const commentSchema = new mongoose.Schema({
-  authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   commentedModel: {
     type: String,
-    enum: ['Battle', 'Comment', 'Submission']
+    enum: ['Battle', 'Comment', 'Submission'],
   },
-  creationTime: {type: Date, default: Date.now},
-  postId: { type: mongoose.Schema.Types.ObjectId,
-            refPath: 'commentedModel' },
-  text: String
+  creationTime: { type: Date, default: Date.now },
+  post: { type: mongoose.Schema.Types.ObjectId, refPath: 'commentedModel' },
+  text: String,
 });
 
-/* Enforce that each Comment is unique.  */
-commentSchema.index(
-  { authorId: 1, commentedModel: 1, postId: 1 },
-  { unique: true }
-);
-
-commentSchema.pre(['deleteMany', 'findOneAndDelete'], async function() {
+commentSchema.pre(['deleteMany'], async function () {
   const results = await Comment.find(this.getQuery(), '_id');
-  const _ids = results.map(comment => comment._id);
+  const _ids = results.map((comment) => comment._id);
+  if (_ids.length === 0) return;
+
   /* Delete all votes on Comment.  */
   await Vote.deleteMany({
     votedModel: 'Comment',
-    postId: { $in: _ids }
+    post: { $in: _ids },
+  });
+
+  /* Delete all replies to Comment.  */
+  await Comment.deleteMany({
+    commentedModel: 'Comment',
+    post: { $in: _ids },
   });
 });
 

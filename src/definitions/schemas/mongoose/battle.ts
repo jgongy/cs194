@@ -1,4 +1,4 @@
-"use strict"
+'use strict';
 
 import mongoose = require('mongoose');
 import { Comment } from './comment';
@@ -15,8 +15,8 @@ import { Vote } from './vote';
  *         _id:
  *           type: string
  *         __v:
- *           type: number 
- *         authorId:
+ *           type: number
+ *         author:
  *           type: string
  *         caption:
  *           type: string
@@ -30,30 +30,30 @@ import { Vote } from './vote';
  *           type: string
  */
 const battleSchema = new mongoose.Schema({
-  authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   caption: String,
   creationTime: { type: Date, default: Date.now },
   deadline: Date,
-  filename: String
+  filename: String,
 });
 
 /* Middleware to delete or update Battle-related documents before deletion.  */
-battleSchema.pre(['deleteMany'], async function() {
+battleSchema.pre(['deleteMany', 'findOneAndDelete'], async function () {
   const results = await Battle.find(this.getQuery(), '_id');
-  const _ids = results.map(battle => battle._id);
+  const _ids = results.map((battle) => battle._id);
   /* Delete all votes on Battle.  */
   await Vote.deleteMany({
     votedModel: 'Battle',
-    postId: { $in: _ids }
+    post: { $in: _ids },
   });
-  /* Delete all comments in Battle.  */
+  /* Delete all comments on Battle.  */
   await Comment.deleteMany({
     commentedModel: 'Battle',
-    postId: { $in: _ids }
+    post: { $in: _ids },
   });
   /* Delete all submissions to Battle.  */
   await Submission.deleteMany({
-    battleId: { $in: _ids }
+    battle: { $in: _ids },
   });
 });
 

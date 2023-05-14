@@ -1,10 +1,57 @@
 'use strict';
 
 import express = require('express');
+import fs = require('fs');
+import path = require('path');
 import { Battle } from '../../definitions/schemas/mongoose/battle';
+import { checkSchema, matchedData, validationResult } from 'express-validator';
+import { NewBattle } from '../../definitions/schemas/validation/newBattle';
+import { NewSubmission } from '../../definitions/schemas/validation/newSubmission';
+import { Submission } from '../../definitions/schemas/mongoose/submission';
+import { Comment } from '../../definitions/schemas/mongoose/comment';
+import { UpdateBattle } from '../../definitions/schemas/validation/updateBattle';
 import { upload } from '../../server';
+import { voteOn, unvoteOn } from '../../definitions/schemas/mongoose/vote';
 
+import * as constants from '../../definitions/constants';
+const IMAGE_DIR = process.env.IMAGE_DIR || constants._imageDir;
 const battleRouter = express.Router();
+
+/**
+ * @openapi
+ * /battle/all:
+ *   get:
+ *     summary: Get all battle IDs.
+ *     responses:
+ *       200:
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *       404:
+ *         $ref: '#/components/responses/404NotFound'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.get('/all', async (req, res) => {
+  const query = Battle.find();
+  try {
+    const result = await query.distinct('_id').exec();
+    if (result) {
+      /* Retrieved battle ids.  */
+      res.status(200).json(result);
+    } else {
+      /* Did not find a battles.  */
+      res.status(404).send('Invalid battle id.');
+    }
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    console.error(err);
+  }
+});
 
 /**
  * @openapi
@@ -15,9 +62,13 @@ const battleRouter = express.Router();
  *       - $ref: '#/components/parameters/idParam'
  *     responses:
  *       200:
- *         description: Successfully returned information about battle.
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Battle'
  *       404:
- *         $ref: '#/components/responses/404ResourceNotFound'
+ *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
  */
@@ -25,12 +76,12 @@ battleRouter.get('/:id', async (req, res) => {
   const battleId = req.params.id;
   const query = Battle.findById(battleId);
   try {
-    const result = await query.lean().exec();
+    const result = await query.populate('author').lean().exec();
     if (result) {
-      /* Found battle matching battleId.  */
+      /* Found battle matching battle id.  */
       res.status(200).json(result);
     } else {
-      /* Did not find a battle with matching battleId.  */
+      /* Did not find a battle with matching battle id.  */
       res.status(404).send('Invalid battle id.');
     }
   } catch (err) {
@@ -48,7 +99,6 @@ battleRouter.get('/:id', async (req, res) => {
  *       - $ref: '#/components/parameters/idParam'
  *     requestBody:
  *       description: Battle information to be updated.
- *       require: true
  *       content:
  *         application/x-www-form-urlencoded:
  *           schema:
@@ -65,47 +115,57 @@ battleRouter.get('/:id', async (req, res) => {
  *     responses:
  *       200:
  *         description: Successfully updated battle information.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Battle'
  *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
+ *         $ref: '#/components/responses/401Unauthorized'
  *       403:
- *         $ref: '#/components/responses/403'
+ *         $ref: '#/components/responses/403Forbidden'
  *       404:
- *         $ref: '#/components/responses/404ResourceNotFound'
+ *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
  */
-battleRouter.put('/:id', async (req, res) => {
+battleRouter.put('/:id', checkSchema(UpdateBattle), async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    res.status(400).json({
+      errors: errors.array(),
+    });
+    return;
+  }
+
+  if (!req.session.loggedIn) {
+    res.status(401).send('Not logged in.');
+    return;
+  }
+
+  const battleId = req.params.id;
+  const query = Battle.findById(battleId);
   try {
-    const battleId = req.params.id;
-    const query = Battle.findById(battleId);
     const result = await query.exec();
-    if (result) {
-      /* Found battle matching battleId. */
-      if (!req.session.loggedIn) {
-        res.status(401).send('Not logged in');
-      } else if (result.authorId.toString() !== req.session.userId) {
-        res.status(403).send('Access to that resource is forbidden');
-      } else {
-        const caption =
-          req.body.caption !== null ? req.body.caption : result.caption;
-        const deadline =
-          req.body.deadline !== null ? req.body.deadline : result.deadline;
-        await Battle.updateOne(
-          { _id: battleId },
-          {
-            $set: {
-              caption: caption,
-              deadline: deadline,
-            },
-          }
-        );
-        const updatedBattle = await Battle.findById(battleId).exec();
-        res.status(200).json(updatedBattle);
-      }
-    } else {
-      /* Did not find a battle with matching battleId. */
+    if (!result) {
+      /* Did not find a battle with matching battle id. */
       res.status(404).send('Invalid battle id.');
+      return;
     }
+
+    if (result.author.toString() !== req.session.userId) {
+      /* User is not the owner of the resource.  */
+      res.status(403).send('Access to that resource is forbidden.');
+      return;
+    }
+
+    const body = matchedData(req);
+    const updatedBattle = await Battle.findByIdAndUpdate(
+      battleId,
+      { $set: body },
+      { new: true }
+    ).exec();
+
+    res.status(200).json(updatedBattle);
   } catch (err) {
     res.status(500).send('Internal server error.');
     console.error(err);
@@ -119,7 +179,6 @@ battleRouter.put('/:id', async (req, res) => {
  *     summary: Creating a new battle by a user.
  *     requestBody:
  *       description: Battle information to be updated.
- *       require: true
  *       content:
  *         multipart/form-data:
  *           schema:
@@ -140,30 +199,396 @@ battleRouter.put('/:id', async (req, res) => {
  *     responses:
  *       200:
  *         description: Successfully created new battle.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Battle'
  *       400:
- *         description: Missing information to create a new battle.
+ *         description: Missing or invalid information to create a new battle.
  *       401:
- *         $ref: '#/components/responses/401NotLoggedIn'
+ *         $ref: '#/components/responses/401Unauthorized'
  *       500:
  *         $ref: '#/components/responses/500'
  */
-battleRouter.post('/new', upload.single('file'), async (req, res) => {
-  try {
-    if (req.session.loggedIn) {
-      // TODO: Ensure all params are valid
-      const newBattleObj = await Battle.create({
-        authorId: req.session.userId,
-        caption: req.body.caption,
-        deadline: req.body.deadline,
-        filename: req.file.filename,
-        numLikes: 1,
-        numSubmissions: 1,
-      });
-      await newBattleObj.save();
-      res.status(200).json(newBattleObj);
-    } else {
-      res.status(401).send('Not logged in');
+battleRouter.post(
+  '/new',
+  upload.single('file'),
+  checkSchema(NewBattle),
+  async (req, res) => {
+    if (!req.file) {
+      res.status(400).send('Invalid file.');
+      return;
     }
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      res.status(400).json({
+        errors: errors.array(),
+      });
+      return;
+    }
+
+    if (!req.session.loggedIn) {
+      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      res.status(401).send('Not logged in.');
+      return;
+    }
+
+    try {
+      const newBattleObj = await Battle.create({
+        ...{
+          author: req.session.userId,
+          filename: req.file.filename,
+        },
+        ...matchedData(req),
+      });
+      res.status(200).json(newBattleObj);
+    } catch (err) {
+      res.status(500).send('Internal server error.');
+      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      console.error(err);
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /battle/{id}/submit:
+ *   post:
+ *     summary: Creating a new submission to a battle by a user.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     requestBody:
+ *       description: Submission object.
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               caption:
+ *                 type: string
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *             required:
+ *               - caption
+ *               - file
+ *     responses:
+ *       200:
+ *         description: Successfully created new submission.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Submission'
+ *       400:
+ *         description: Missing information to create a new submission.
+ *       401:
+ *         $ref: '#/components/responses/401Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/404NotFound'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.post(
+  '/:id/submit',
+  upload.single('file'),
+  checkSchema(NewSubmission),
+  async (req, res) => {
+    if (!req.file) {
+      res.status(400).send('Invalid file.');
+      return;
+    }
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      res.status(400).json({
+        errors: errors.array(),
+      });
+      return;
+    }
+
+    if (!req.session.loggedIn) {
+      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      res.status(401).send('Not logged in.');
+      return;
+    }
+
+    const battleId = req.params.id;
+    try {
+      const battleObj = await Battle.findById(battleId).lean().exec();
+      if (!battleObj) {
+        /* Battle does not exist.  */
+        await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+        res.status(404).send('Battle does not exist.');
+        return;
+      }
+      const newSubmissionObj = await Submission.create({
+        ...{
+          author: req.session.userId,
+          filename: req.file.filename,
+        },
+        ...matchedData(req),
+      });
+      res.status(200).json(newSubmissionObj);
+    } catch (err) {
+      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      res.status(500).send('Internal server error.');
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /battle/{id}/vote:
+ *   put:
+ *     summary: Vote on a battle.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Successfully voted on battle.
+ *       401:
+ *         $ref: '#/components/responses/401Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/404NotFound'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.put('/:id/vote', async (req, res) => {
+  if (!req.session.loggedIn) {
+    res.status(401).send('Must be logged in to perform this action.');
+    return;
+  }
+
+  const battleId = req.params.id;
+  const query = Battle.findOne({ _id: battleId });
+  try {
+    const result = await query.lean().exec();
+    if (!result) {
+      res.status(404).send('Resource not found.');
+      return;
+    }
+
+    await voteOn('Battle', battleId, req.session.userId);
+    res.status(200).send('Successfully voted on battle.');
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    console.error(err);
+  }
+});
+
+/**
+ * @openapi
+ * /battle/{id}/unvote:
+ *   put:
+ *     summary: Unvote a battle.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Successfully unvoted battle.
+ *       401:
+ *         $ref: '#/components/responses/401Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/404NotFound'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.put('/:id/unvote', async (req, res) => {
+  if (!req.session.loggedIn) {
+    res.status(401).send('Must be logged in to perform this action.');
+    return;
+  }
+
+  const battleId = req.params.id;
+  const query = Battle.findOne({ _id: battleId });
+  try {
+    const result = await query.lean().exec();
+    if (!result) {
+      res.status(404).send('Resource not found.');
+      return;
+    }
+
+    await unvoteOn('Battle', battleId, req.session.userId);
+    res.status(200).send('Successfully unvoted battle.');
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    console.error(err);
+  }
+});
+
+/**
+ * @openapi
+ * /battle/{id}/comments:
+ *   get:
+ *     summary: Retrieve comments for battle.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Comment'
+ *       404:
+ *         $ref: '#/components/responses/404NotFound'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.get('/:id/comments', async (req, res) => {
+  const battleId = req.params.id;
+  const query = Comment.find({
+    commentedModel: 'Battle',
+    post: battleId,
+  });
+  try {
+    const result = await query.exec();
+    if (result) {
+      /* Found comments on battle. */
+      res.status(200).json(result);
+    } else {
+      /* Did not find a battle with matching battleId. */
+      res.status(404).send('Invalid battle id.');
+    }
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    console.error(err);
+  }
+});
+
+/**
+ * @openapi
+ * /battle/{id}/comment:
+ *   post:
+ *     summary: Creating a new comment by a user on a battle.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     requestBody:
+ *       description: Comment information.
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successfully created new comment.
+ *       400:
+ *         description: Missing information to create a new comment.
+ *       401:
+ *         $ref: '#/components/responses/401Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.post('/:id/comment', async (req, res) => {
+  if (!req.session.loggedIn) {
+    res.status(401).send('Not logged in.');
+    return;
+  }
+  if (req.body.comment === '') {
+    res.status(400).send('Missing information to create a new comment.');
+    return;
+  }
+  const battleId = req.params.id;
+  try {
+    const newCommentObj = await Comment.create({
+      author: req.session.userId,
+      commentedModel: 'Battle',
+      post: battleId,
+      text: req.body.comment,
+    });
+    res.status(200).json(newCommentObj);
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    console.error(err);
+  }
+});
+
+/**
+ * @openapi
+ * /battle/{id}:
+ *   delete:
+ *     summary: Delete battle if user is the battle creator.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Successfully deleted battle.
+ *       401:
+ *         $ref: '#/components/responses/401Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/403Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/404NotFound'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.delete('/:id', async (req, res) => {
+  if (!req.session.loggedIn) {
+    res.status(401).send('User not logged in.');
+    return;
+  }
+  const battleId = req.params.id;
+  /* Delete submission.  */
+  const query = Battle.findOneAndDelete({
+    _id: battleId,
+    author: req.session.userId,
+  });
+  try {
+    const battleObj = await query.lean().exec();
+    if (!battleObj) {
+      res.status(404).send('Failed to find battle.');
+      console.error('Failed to find battle.');
+    } else {
+      res.status(200).send('Successfully deleted battle.');
+    }
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    console.error(err);
+  }
+});
+
+/**
+ * @openapi
+ * /battle/{id}/submissions:
+ *   get:
+ *     summary: Retrieve submissions for battle.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Submission'
+ *       404:
+ *         $ref: '#/components/responses/404NotFound'
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+battleRouter.get('/:id/submissions', async (req, res) => {
+  const battleId = req.params.id;
+  try {
+    const battleObj = await Battle.findById(battleId).lean().exec();
+    /* Did not find battle with matching battleId. */
+    if (!battleObj) {
+      res.status(404).send('Invalid battle id.');
+      return;
+    }
+    const result = await Submission.find({
+      battle: battleId,
+    }).exec();
+    /* Return submissions on battle. */
+    res.status(200).json(result);
   } catch (err) {
     res.status(500).send('Internal server error.');
     console.error(err);

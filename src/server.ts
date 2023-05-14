@@ -3,16 +3,20 @@
 import express = require('express');
 import fs = require('fs');
 import mongoose = require('mongoose');
+import MongoStore = require('connect-mongo');
 import multer = require('multer');
 import path = require('path');
 import session = require('express-session');
 
 import * as constants from './definitions/constants';
 
-const IMAGEDIR = process.env.IMAGEDIR || constants._imageDir;
+const IMAGE_DIR = process.env.IMAGE_DIR || constants._imageDir;
+const MONGODB_URI = process.env.MONGODB_URI
+                    || 'mongodb://127.0.0.1:27017/'
+                       + constants._mongoDatabaseName;
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, IMAGEDIR);
+    cb(null, IMAGE_DIR);
   },
   filename: function (req, file, cb) {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -31,6 +35,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     secret: process.env.SESSIONSECRET || constants._sessionSecret,
+    store: MongoStore.create({ mongoUrl: MONGODB_URI })
   })
 );
 
@@ -40,11 +45,14 @@ app.use('/account', accountRouter);
 import { battleRouter } from './endpoints/battle/battle';
 app.use('/battle', battleRouter);
 
+import { commentRouter } from './endpoints/comment/comment';
+app.use('/comment', commentRouter);
+
 import { imageRouter } from './endpoints/image/image';
 app.use('/image', imageRouter);
 
-import { commentRouter } from './endpoints/comment/comment';
-app.use('/comment', commentRouter );
+import { submissionRouter } from './endpoints/submission/submission';
+app.use('/submission', submissionRouter);
 
 import { swaggerRouter } from './endpoints/swagger/swagger';
 app.use('/swagger', swaggerRouter);
@@ -55,21 +63,18 @@ app.use('/test', testRouter);
 import { userRouter } from './endpoints/user/user';
 app.use('/user', userRouter);
 
-/*
- * Not called on because index.html is served instead, as expected.
-app.get('/', function(request: express.Request, response: express.Response) {
-  response.send('Simple web server of files from ' + __dirname);
+import { voteRouter } from './endpoints/vote/vote';
+app.use('/vote', voteRouter);
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/index.html'));
 });
-*/
 
 async function initServer() {
-  const MONGODB_URI = process.env.MONGODB_URL
-                      || 'mongodb://127.0.0.1:27017/'
-                         + constants._mongoDatabaseName;
   mongoose.connect(MONGODB_URI);
 
-  if (!fs.existsSync(IMAGEDIR)){
-    fs.mkdirSync(IMAGEDIR, { recursive: true });
+  if (!fs.existsSync(IMAGE_DIR)){
+    fs.mkdirSync(IMAGE_DIR, { recursive: true });
   }
 
   const PORT = process.env.PORT || constants._portNum;
