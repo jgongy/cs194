@@ -5,7 +5,7 @@
   "main": "server.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint . --ext .ts,.tsx && tsc --noEmit",
     "build": "rimraf dist && tsc && webpack --config dist/webpack.config.js",
     "start": "node dist/server.js",
     "build:dev": "webpack --config webpack.config.ts",
