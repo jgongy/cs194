@@ -12,7 +12,8 @@
     "start:dev": "nodemon server.ts",
     "watch": "npm run build:dev && webpack serve --config webpack.config.ts",
     "load": "ts-node ./development/loadDatabase.ts && mkdir -p public/images && cp development/images/* public/images/",
-    "clear": "ts-node ./development/clearDatabase.ts"
+    "clear": "ts-node ./development/clearDatabase.ts",
+    "postinstall": "npm run load && npm run build"
   },
   "author": "",
   "license": "ISC",
