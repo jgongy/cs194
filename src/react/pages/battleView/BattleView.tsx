@@ -1,15 +1,16 @@
 import React from 'react';
 import { BattleCard } from '../../components/battleCard/BattleCard';
-import { useParams } from 'react-router-dom';
+import { Outlet, useParams } from 'react-router-dom';
 
-const Battle = () => {
+const BattleView = () => {
   const { id } = useParams();
   
   return (
-    <>
+    <React.Fragment>
       <BattleCard battleId={id} />
-    </>
+      <Outlet />
+    </React.Fragment>
   );
 };
 
-export { Battle };
+export { BattleView };
