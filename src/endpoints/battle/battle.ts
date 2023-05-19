@@ -221,7 +221,7 @@ battleRouter.post(
     }
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      await fs.promises.unlink(path.join(IMAGE_DIR, req.file.filename));
       res.status(400).json({
         errors: errors.array(),
       });
@@ -302,7 +302,7 @@ battleRouter.post(
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      await fs.promises.unlink(path.join('.', IMAGE_DIR, req.file.filename));
+      await fs.promises.unlink(path.join(IMAGE_DIR, req.file.filename));
       res.status(400).json({
         errors: errors.array(),
       });
