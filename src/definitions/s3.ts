@@ -1,10 +1,17 @@
 "use strict"
+
+import dotenv = require('dotenv');
+dotenv.config();
 import fs = require('fs');
+import path = require('path');
+import * as constants from './constants';
+const IMAGE_DIR = process.env.IMAGE_DIR || constants._imageDir;
 import AWS = require('aws-sdk');
-const AWS_ACCESS_KEY_ID = process.env.BUCKETEER_AWS_ACCESS_KEY_ID || null;
-const AWS_REGION = process.env.BUCKETEER_AWS_REGION || null;
-const AWS_SECRET_ACCESS_KEY = process.env.BUCKETEER_AWS_SECRET_ACCESS_KEY || null;
-const AWS_BUCKET_NAME = process.env.BUCKETEER_BUCKET_NAME || null;
+const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || null;
+const AWS_REGION = process.env.AWS_REGION || null;
+const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || null;
+const AWS_BUCKET_NAME = process.env.BUCKET_NAME || null;
+
 const s3 = new AWS.S3({
   region: AWS_REGION,
   accessKeyId: AWS_ACCESS_KEY_ID,
@@ -15,11 +22,19 @@ const s3 = new AWS.S3({
 const uploadFileToS3 = (file) => {
   const fileStream = fs.createReadStream(file.path);
   const uploadParams = {
-    Bucket: AWS_BUCKET_NAME,
     Body: fileStream,
-    Key: file.filename
+    Bucket: AWS_BUCKET_NAME,
+    Key: path.join(IMAGE_DIR, file.filename),
   };
   return s3.upload(uploadParams).promise();
 };
 
-export { AWS_BUCKET_NAME, uploadFileToS3 };
+const getFileFromS3 = (fileKey) => {
+  const downloadParams = {
+    Bucket: AWS_BUCKET_NAME,
+    Key: fileKey
+  };
+  return s3.getObject(downloadParams).createReadStream();
+};
+
+export { AWS_BUCKET_NAME, uploadFileToS3, getFileFromS3 };
