@@ -1,8 +1,12 @@
-"use strict"
+'use strict';
 
 import express = require('express');
 import { checkSchema, validationResult } from 'express-validator';
+import { Battle } from '../../definitions/schemas/mongoose/battle';
+import { Comment } from '../../definitions/schemas/mongoose/comment';
+import { Submission } from '../../definitions/schemas/mongoose/submission';
 import { User } from '../../definitions/schemas/mongoose/user';
+import { Vote } from '../../definitions/schemas/mongoose/vote';
 import { UpdateUser } from '../../definitions/schemas/validation/updateUser';
 
 const userRouter = express.Router();
@@ -41,7 +45,11 @@ const userRouter = express.Router();
  */
 userRouter.get('/:id', async (req, res) => {
   const userId = req.params.id;
-  const query = User.findOne({ _id: userId }, ['-__v', '-loginName', '-loginPassword']);
+  const query = User.findOne({ _id: userId }, [
+    '-__v',
+    '-loginName',
+    '-loginPassword',
+  ]);
 
   try {
     const userObj = await query.lean().exec();
@@ -101,7 +109,7 @@ userRouter.put('/', checkSchema(UpdateUser), async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     res.status(400).json({
-      errors: errors.array()
+      errors: errors.array(),
     });
     return;
   }
@@ -110,9 +118,11 @@ userRouter.put('/', checkSchema(UpdateUser), async (req, res) => {
     res.status(401).send('User not logged in.');
     return;
   }
-  const query = User.findOneAndUpdate({ _id: req.session.userId },
-                                      { $set: req.body },
-                                      { new: true });
+  const query = User.findOneAndUpdate(
+    { _id: req.session.userId },
+    { $set: req.body },
+    { new: true }
+  );
   try {
     const userObj = await query.lean().exec();
     if (!userObj) {
@@ -161,6 +171,134 @@ userRouter.delete('/', async (req, res) => {
   } catch (err) {
     res.status(500).send('Internal server error.');
     console.error(err);
+  }
+});
+
+/**
+ * @openapi
+ * /user/{id}/battles:
+ *   get:
+ *     summary: Returns all battles created by user.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+userRouter.get('/:id/battles', async (req, res) => {
+  const userId = req.params.id;
+  const query = Battle.find({ author: userId }, ['_id']);
+
+  try {
+    const battleIds = await query.lean().exec();
+    res.status(200).json(battleIds);
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    return;
+  }
+});
+
+/**
+ * @openapi
+ * /user/{id}/comments:
+ *   get:
+ *     summary: Returns all comments created by user.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+userRouter.get('/:id/comments', async (req, res) => {
+  const userId = req.params.id;
+  const query = Comment.find({ author: userId }, ['_id', 'text', 'post']);
+
+  try {
+    const commentProps = await query.lean().exec();
+    res.status(200).json(commentProps);
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    return;
+  }
+});
+
+/**
+ * @openapi
+ * /user/{id}/submissions:
+ *   get:
+ *     summary: Returns all submissions created by user.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+userRouter.get('/:id/submissions', async (req, res) => {
+  const userId = req.params.id;
+  const query = Submission.find({ author: userId }, ['_id', 'battle']);
+
+  try {
+    const submissionProps = await query.lean().exec();
+    res.status(200).json(submissionProps);
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    return;
+  }
+});
+
+/**
+ * @openapi
+ * /user/{id}/votes:
+ *   get:
+ *     summary: Returns all content voted on by user.
+ *     parameters:
+ *       - $ref: '#/components/parameters/idParam'
+ *     responses:
+ *       200:
+ *         description: Resource successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *       500:
+ *         $ref: '#/components/responses/500'
+ */
+userRouter.get('/:id/votes', async (req, res) => {
+  const userId = req.params.id;
+  const query = Vote.find({ user: userId }, ['-_id', '-__v']);
+
+  try {
+    const voteIds = await query.populate('post', ['_id']).lean().exec();
+    res.status(200).json(voteIds);
+  } catch (err) {
+    res.status(500).send('Internal server error.');
+    return;
   }
 });
 
