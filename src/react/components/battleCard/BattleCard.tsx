@@ -15,6 +15,7 @@ import {
   CardActions,
   CardContent,
   CardMedia,
+  Chip,
   IconButton,
   Tooltip,
   Typography,
@@ -25,14 +26,15 @@ import { updateDeadline } from '../../../definitions/timerLogic';
 import { createSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { UserContext } from '../../contexts/UserContext';
 import './battleCard.css';
-import { ILayoutUserContext } from '../../pages/Layout';
+import { BattleCardInfo } from '../../../definitions/classes/battle';
 
 interface IProps {
   battleId: string;
+  isPhotoOfTheDay?: boolean;
 }
 
-const BattleCard = ({ battleId }: IProps) => {
-  const { loggedInUser, setOpenLoginModal } = useContext(UserContext) as ILayoutUserContext;
+const BattleCard = ({ battleId, isPhotoOfTheDay }: IProps) => {
+  const { loggedInUser, setOpenLoginModal } = useContext(UserContext);
   const [caption, setCaption] = useState('');
   const [filename, setFilename] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -43,9 +45,9 @@ const BattleCard = ({ battleId }: IProps) => {
   const [submitted, setSubmitted] = useState(false);
   const [voted, setVoted] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState('--:--:--');
-  const [expired, setExpired] = useState(true);
+  const [expired, setExpired] = useState<boolean>(true);
 
-  const _battle = useRef(null);
+  const _battle = useRef<BattleCardInfo| null>(null);
   const _timerEvent = useRef<NodeJS.Timer | null>(null);
 
   const location = useLocation();
@@ -56,25 +58,25 @@ const BattleCard = ({ battleId }: IProps) => {
     let shouldUpdate = true;
     const setBattleInformation = async () => {
       const path = `/battle/${battleId}`;
-      const res = await axios.get(path);
+      const res = await axios.get<BattleCardInfo>(path);
       const battle = res.data;
 
       if (shouldUpdate) {
         setCaption(battle.caption);
         setFilename(battle.filename);
         setNumComments(battle.numComments);
-        setCommented(battle.commentedOn);
+        setCommented(!!battle.commentedOn);
         setNumSubmissions(battle.numSubmissions);
-        setSubmitted(battle.submittedTo);
+        setSubmitted(!!battle.submittedTo);
         setNumVotes(battle.numVotes);
-        setVoted(battle.votedOn);
+        setVoted(!!battle.votedOn);
         _battle.current = battle;
         updateDeadline(
           new Date(battle.deadline),
           _timerEvent,
           setTimeRemaining,
           setExpired,
-          expired
+          !!expired
         );
       }
     };
@@ -148,7 +150,6 @@ const BattleCard = ({ battleId }: IProps) => {
             location.pathname === '/' ||
             location.pathname.startsWith('/users')
           ) {
-            console.log('Open post');
             navigate(`/battles/${battleId}`);
           }
         }}
@@ -163,8 +164,21 @@ const BattleCard = ({ battleId }: IProps) => {
           onClick={() => {
             openCommentModal();
           }}
-          sx={{ width: '100%' }}
+          sx={{ width: '100%', position: 'relative' }}
         >
+          {isPhotoOfTheDay &&
+            (
+              <Chip
+                label="Photo of the Day"
+                color="warning"
+                sx={{
+                  position: 'absolute',
+                  top: '5px',
+                  right: '5px',
+                }}
+              />
+            )
+          }
           <CardMedia
             component='img'
             image={imageUrl}
@@ -198,10 +212,10 @@ const BattleCard = ({ battleId }: IProps) => {
               if (loggedInUser._id !== '' && !expired) {
                 vote();
               } else {
-                setOpenLoginModal(true);
+                setOpenLoginModal && setOpenLoginModal(true);
               }
             }}
-            disableRipple={expired}
+            disableRipple={!!expired}
           >
             {
               expired
@@ -245,7 +259,6 @@ const BattleCard = ({ battleId }: IProps) => {
                       onClick={(event) => {
                         event.stopPropagation();
                         event.preventDefault();
-                        console.log('Open submit page');
                         navigate(`/battles/${battleId}/submit`);
                       }}
                       variant='outlined'

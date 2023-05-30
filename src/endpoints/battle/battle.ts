@@ -26,6 +26,11 @@ const battleRouter = express.Router();
  * /battle/all:
  *   get:
  *     summary: Get all battle IDs, filtering for open comps only if needed.
+ *     parameters:
+ *       - in: query
+ *         name: open
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Resource successfully retrieved.
@@ -34,24 +39,57 @@ const battleRouter = express.Router();
  *             schema:
  *               type: array
  *               items:
- *                 type: string
+ *                 type: object
+ *                 properties:
+ *                   _id:
+ *                     type: boolean
  *       404:
  *         $ref: '#/components/responses/404NotFound'
  *       500:
  *         $ref: '#/components/responses/500'
  */
 battleRouter.get('/all', async (req, res) => {
-  let deadline = new Date(0);
-  if (req.query['openCompetitionsOnly'] === 'true') {
+  const filter = {} as { deadline?: { $gte: Date }, _id?: { $ne: mongoose.Types.ObjectId } };
+  if (req.query['open'] === 'true') {
+    /* Filter for all battles that have at least an hour left.  */
     const today = new Date();
     const futureDeadline = new Date();
     futureDeadline.setHours(today.getHours() + 1);
-    deadline = futureDeadline;
+    filter.deadline = { $gte: futureDeadline };
   }
-  const filter = { deadline: { $gte: deadline } };
-  const query = Battle.find(filter);
+
+  let dailyBattle: (mongoose.FlattenMaps<{
+    author: mongoose.Types.ObjectId;
+    caption: string;
+    creationTime: Date;
+    deadline: Date;
+    filename: string;
+  }> & {
+    _id: mongoose.Types.ObjectId;
+  }) | null = null;
+  {
+    /* Retrieve a random battle for the day.  */
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+    const grEqOneDayFilter = {
+      deadline: {
+        $gte: tomorrow,
+      },
+    };
+    const count = await Battle.countDocuments(grEqOneDayFilter).exec();
+    const numToSkip = Math.floor(today.getTime() / (3600 * 24 * 1000)) % count;
+    const query = Battle.findOne(grEqOneDayFilter, ['_id']).skip(numToSkip);
+    dailyBattle = await query.lean().exec();
+    if (dailyBattle) {
+      filter._id = { $ne: dailyBattle._id };
+    }
+  }
+
+  const query = Battle.find(filter, ['_id']);
   try {
-    const result = await query.distinct('_id').exec();
+    const result = await query.lean().exec();
+    if (dailyBattle) result.unshift(dailyBattle);
     if (result) {
       /* Retrieved battle ids.  */
       res.status(200).json(result);
@@ -133,15 +171,15 @@ battleRouter.get('/:id', upload.none(), checkSchema(ValidObjectId), async (req: 
   const query = Battle.findById(battleId);
 
   const numCommentsQuery = Comment.countDocuments({ post: battleId });
-  const numSubmissionsQuery = Submission.countDocuments({ battle: battleId });
+  const numSubmissionsQuery = Submission.countDocuments({ post: battleId });
   const numVotesQuery = Vote.countDocuments({ post: battleId });
 
   const commentedOnQuery = Comment.findOne({ post: battleId,
                                             author: req.session.userId });
-  const submittedToQuery = Submission.findOne({ battle: battleId,
+  const submittedToQuery = Submission.findOne({ post: battleId,
                                             author: req.session.userId });
   const votedOnQuery = Vote.findOne({ post: battleId,
-                                      user: req.session.userId });
+                                      author: req.session.userId });
   try {
     let result = await query.populate('author').lean().exec();
     if (result) {
@@ -430,15 +468,14 @@ battleRouter.post(
       const newSubmissionObj = await Submission.create({
         ...{
           author: req.session.userId,
-          battle: battleId,
+          post: battleId,
           filename: req.file.filename,
         },
         ...matchedData(req),
       });
       /* Uploading to S3.  */
       if (AWS_BUCKET_NAME) {
-        const s3Result = await uploadFileToS3(req.file);
-        console.log(s3Result);
+        await uploadFileToS3(req.file);
         await fs.promises.unlink(path.join(IMAGE_DIR, req.file.filename));
       }
       res.status(200).json(newSubmissionObj);
@@ -587,11 +624,7 @@ battleRouter.get('/:id/comments', upload.none(), checkSchema(ValidObjectId), asy
   const query = Comment.find({
     commentedModel: 'Battle',
     post: battleId,
-  }).populate('author', [
-    '-loginName',
-    '-loginPassword',
-    '-__v'
-  ]).populate('post', [
+  }).populate('author').populate('post', [
     '-author',
     '-__v'
   ]);
@@ -661,7 +694,7 @@ battleRouter.post('/:id/comment', upload.none(), checkSchema(ValidObjectId), asy
       author: req.session.userId,
       commentedModel: 'Battle',
       post: battleId,
-      text: req.body.comment,
+      caption: req.body.comment,
     });
     res.status(200).json(newCommentObj);
   } catch (err) {
@@ -713,7 +746,6 @@ battleRouter.delete('/:id', upload.none(), checkSchema(ValidObjectId), async (re
     const battleObj = await query.lean().exec();
     if (!battleObj) {
       res.status(404).send('Failed to find battle.');
-      console.error('Failed to find battle.');
     } else {
       res.status(200).send('Successfully deleted battle.');
     }
@@ -762,7 +794,7 @@ battleRouter.get('/:id/submissions', upload.none(), checkSchema(ValidObjectId), 
       return;
     }
     const result = await Submission.find({
-      battle: battleId,
+      post: battleId,
     }).exec();
     /* Return submissions on battle. */
     res.status(200).json(result);
