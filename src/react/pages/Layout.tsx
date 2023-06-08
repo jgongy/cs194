@@ -4,10 +4,11 @@ import { Outlet } from 'react-router-dom';
 import { LoggedInUser, UserContext } from '../contexts/UserContext';
 
 const Layout = () => {
-  const [openLoginModal, setOpenLoginModal] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState(new LoggedInUser());
+  const [openLoginModal, setOpenLoginModal] = useState<boolean>(false);
+  const [loggedInUser, setLoggedInUser] = useState<LoggedInUser>(new LoggedInUser());
+  const [sortBy, setSortBy] = useState<string>('New');
 
-  const contextValue = { openLoginModal, setOpenLoginModal, loggedInUser, setLoggedInUser };
+  const contextValue = { openLoginModal, setOpenLoginModal, loggedInUser, setLoggedInUser, sortBy, setSortBy };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('loggedInUser');

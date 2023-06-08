@@ -34,7 +34,7 @@ const accountRouter = express.Router();
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/User'
+ *               $ref: '#/components/schemas/UserFrontend'
  *       401:
  *         $ref: '#/components/responses/401Unauthorized'
  *       500:
@@ -123,7 +123,7 @@ accountRouter.post('/logout', (req, res) => {
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/User'
+ *               $ref: '#/components/schemas/UserFrontend'
  *       400:
  *         description: Faulty information to create new user.
  *       500:
@@ -144,6 +144,7 @@ accountRouter.post('/new', upload.none(), checkSchema(NewUser), async (req: expr
     req.session.userId = userObj._id.toString();
     res.status(200).json(userObj.toObject());
   } catch (err) {
+    console.error(err);
     res.status(500).send('Internal server error.');
   }
 });

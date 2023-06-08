@@ -5,17 +5,20 @@ import {
   AppBar,
   Box,
   Button,
+  Icon,
   Menu,
   MenuItem,
   Stack,
   Toolbar,
-  Typography
+  Typography,
 } from '@mui/material';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 // import { LoggedInUser, UserContext } from '../../pages/Layout';
 import { LoggedInUser, UserContext } from '../../contexts/UserContext';
 import { LoginModal } from '../loginModal/LoginModal';
 import { Link, useNavigate } from 'react-router-dom';
+// import SwordIcon from '../../assets/swords-icon.svg';
+const SwordIcon = require('../../assets/swords-icon.svg');
 
 const TopBar = () => {
   const {
@@ -43,8 +46,8 @@ const TopBar = () => {
 
   return (
     <AppBar
-      elevation={1}
-      position="fixed"
+      elevation={0}
+      position='fixed'
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1
       }}
@@ -66,6 +69,12 @@ const TopBar = () => {
             }}
             variant="h5"
           >
+            <Icon>
+              <Box
+                component="img"
+                src={SwordIcon}
+              />
+            </Icon>
             PHOTOWARS
           </Typography>
           <Box>
