@@ -28,7 +28,6 @@ const getLocalISOString = (date: Date) => {
 };
 
 const moveImagesToPublic = async (pathToImages: string, filename: string) => {
-  console.log("Moving to public");
   const dir = await fs.opendir(pathToImages);
   for await (const imageDirent of dir) {
     const imagePath = path.join(pathToImages, imageDirent.name);
