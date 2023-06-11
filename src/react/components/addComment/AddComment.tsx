@@ -1,14 +1,7 @@
 import * as React from 'react';
 import { useContext, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import {
-  Avatar,
-  Box,
-  Button,
-  Card,
-  Stack,
-  TextField,
-} from '@mui/material';
+import { Avatar, Box, Button, Card, Stack, TextField } from '@mui/material';
 import { getImageUrl } from '../../../definitions/getImageUrl';
 import { UserContext } from '../../contexts/UserContext';
 
@@ -48,11 +41,7 @@ const AddComment = ({ postComment }: IProps) => {
     <Card>
       <Box sx={{ p: '15px' }}>
         <Stack direction='row' spacing={2} alignItems='flex-start'>
-          <Avatar
-            src={imageUrl}
-          >
-            {loggedInUser.displayName[0]}
-          </Avatar>
+          <Avatar src={imageUrl}>{loggedInUser.displayName[0]}</Avatar>
           <TextField
             fullWidth
             placeholder='Add a comment'
