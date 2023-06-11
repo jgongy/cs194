@@ -9,8 +9,14 @@ import {
 } from 'react-router-dom';
 
 /* Importing Components */
-import { BattleView, battleViewLoader } from './react/pages/battleView/BattleView';
-import { CommentModal, commentModalLoader } from './react/pages/commentModal/CommentModal';
+import {
+  BattleView,
+  battleViewLoader,
+} from './react/pages/battleView/BattleView';
+import {
+  CommentModal,
+  commentModalLoader,
+} from './react/pages/commentModal/CommentModal';
 import { Create } from './react/pages/create/Create';
 import { Feed, feedLoader } from './react/pages/feed/Feed';
 import { Home } from './react/pages/home/Home';
@@ -38,19 +44,26 @@ const PhotoWars = () => {
             errorElement={<div>Error viewing battle</div>}
           >
             <Route
-              path=""
+              path=''
               element={<SubmissionFeed />}
               loader={submissionFeedLoader}
               errorElement={<div>Error loading submissions</div>}
             >
               <Route
-                path="comments/:postId"
+                path='comments/:postId'
                 element={<CommentModal />}
                 loader={commentModalLoader}
                 errorElement={<div>Error loading comments</div>}
               />
             </Route>
-            <Route path='submit' element={<RequireLoginRoute><Submit /></RequireLoginRoute>} />
+            <Route
+              path='submit'
+              element={
+                <RequireLoginRoute>
+                  <Submit />
+                </RequireLoginRoute>
+              }
+            />
           </Route>
           <Route path='create' element={<Create />} />
           <Route
@@ -59,7 +72,7 @@ const PhotoWars = () => {
             loader={userViewLoader}
           >
             <Route
-              path="edit"
+              path='edit'
               element={<UserHeaderEdit />}
               errorElement={<div>Error editing user information.</div>}
             />
@@ -76,8 +89,8 @@ const PhotoWars = () => {
             errorElement={<div>Error fetching battles</div>}
           />
         </Route>
-        <Route path="/404" element={<div>404 Not Found</div>} />
-        <Route path="*" element={<div>404 Not Found</div>} />
+        <Route path='/404' element={<div>404 Not Found</div>} />
+        <Route path='*' element={<div>404 Not Found</div>} />
       </Route>
     )
   );
@@ -88,7 +101,7 @@ const PhotoWars = () => {
         <Box
           sx={{
             minHeight: '100vh',
-            backgroundColor: theme.palette.background.default
+            backgroundColor: theme.palette.background.default,
           }}
         >
           <RouterProvider router={router} />
